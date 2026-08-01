@@ -51,16 +51,21 @@ video-transcoder-gui/
 └── OptiSqueeze.exe            # Lightweight compiled application (135 KB)
 ```
 
----
+## How to Run & Smart App Control
 
-## Compilation
+If your machine has **Windows 11 Smart App Control (SAC)** enabled, running a locally compiled, unsigned `.exe` (like `OptiSqueeze.exe`) might be blocked. 
 
-To compile or build the application from source code:
+To run the application safely and universally on any Windows machine:
+- **Double-click `run.bat`** (or execute `run.ps1` in PowerShell).
+This launcher loads the C# source code (`src/OptiSqueeze.cs`) and compiles it **directly in-memory** using your trusted PowerShell host. Because it executes within the context of a signed host (`powershell.exe`), it runs instantly and bypasses Smart App Control restrictions without changing any system policies or signing certificates.
+
+### Rebuilding manually (Optional)
+If you wish to compile it into a standalone executable file:
 1. Double-click `build.bat` or run it in your terminal:
    ```cmd
    build.bat
    ```
-This utilizes Windows' built-in C# compiler (`csc.exe`) located in `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`. No .NET SDKs, package managers (like npm/pip), or setup configurations are required.
+This utilizes Windows' built-in C# compiler (`csc.exe`) located in `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`. No .NET SDKs or configuration setups are required.
 
 ---
 
