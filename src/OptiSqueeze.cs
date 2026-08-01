@@ -252,75 +252,78 @@ namespace OptiSqueeze
 
         private void UpdateChildControls(DependencyObject parent)
         {
-            int count = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
+            if (parent == null) return;
+            foreach (var childObj in LogicalTreeHelper.GetChildren(parent))
             {
-                var child = VisualTreeHelper.GetChild(parent, i);
-
-                if (child is TextBlock)
+                if (childObj is DependencyObject)
                 {
-                    var tb = (TextBlock)child;
-                    // Keep brand header text color custom, as well as success/error colors
-                    if (tb != brandText && tb.Foreground != GetBrush("#06b6d4") && tb.Foreground != GetBrush("#10b981") && tb.Foreground != GetBrush("#ef4444") && tb.Foreground != GetBrush("#7c3aed"))
+                    var child = (DependencyObject)childObj;
+
+                    if (child is TextBlock)
                     {
-                        if (tb.Tag != null && tb.Tag.ToString() == "muted")
+                        var tb = (TextBlock)child;
+                        // Keep brand header text color custom, as well as success/error colors
+                        if (tb != brandText && tb.Foreground != GetBrush("#06b6d4") && tb.Foreground != GetBrush("#10b981") && tb.Foreground != GetBrush("#ef4444") && tb.Foreground != GetBrush("#7c3aed"))
                         {
-                            tb.Foreground = brushTextMuted;
+                            if (tb.Tag != null && tb.Tag.ToString() == "muted")
+                            {
+                                tb.Foreground = brushTextMuted;
+                            }
+                            else
+                            {
+                                tb.Foreground = brushTextMain;
+                            }
                         }
-                        else
+                    }
+                    else if (child is Border)
+                    {
+                        var border = (Border)child;
+                        if (border.Tag != null)
                         {
+                            string tag = border.Tag.ToString();
+                            if (tag == "card")
+                            {
+                                border.Background = brushCardBg;
+                                border.BorderBrush = brushBorder;
+                            }
+                        }
+                    }
+                    else if (child is System.Windows.Controls.CheckBox)
+                    {
+                        var cb = (System.Windows.Controls.CheckBox)child;
+                        cb.Foreground = brushTextMain;
+                    }
+                    else if (child is System.Windows.Controls.ListView)
+                    {
+                        var lv = (System.Windows.Controls.ListView)child;
+                        lv.Background = brushSidebarBg;
+                        lv.Foreground = brushTextMain;
+                        lv.BorderBrush = brushBorder;
+                    }
+                    else if (child is System.Windows.Controls.TextBox)
+                    {
+                        var tb = (System.Windows.Controls.TextBox)child;
+                        if (tb != consoleLogs)
+                        {
+                            tb.Background = brushCardBg;
                             tb.Foreground = brushTextMain;
+                            tb.BorderBrush = brushBorder;
                         }
                     }
-                }
-                else if (child is Border)
-                {
-                    var border = (Border)child;
-                    if (border.Tag != null)
+                    else if (child is System.Windows.Controls.Button)
                     {
-                        string tag = border.Tag.ToString();
-                        if (tag == "card")
+                        var btn = (System.Windows.Controls.Button)child;
+                        if (btn.Tag != null && btn.Tag.ToString() == "secondary")
                         {
-                            border.Background = brushCardBg;
-                            border.BorderBrush = brushBorder;
+                            btn.Background = isDarkTheme ? GetBrush("rgba(255,255,255,0.05)") : GetBrush("rgba(15,23,42,0.05)");
+                            btn.BorderBrush = brushBorder;
+                            btn.Foreground = brushTextMain;
                         }
                     }
-                }
-                else if (child is System.Windows.Controls.CheckBox)
-                {
-                    var cb = (System.Windows.Controls.CheckBox)child;
-                    cb.Foreground = brushTextMain;
-                }
-                else if (child is System.Windows.Controls.ListView)
-                {
-                    var lv = (System.Windows.Controls.ListView)child;
-                    lv.Background = brushSidebarBg;
-                    lv.Foreground = brushTextMain;
-                    lv.BorderBrush = brushBorder;
-                }
-                else if (child is System.Windows.Controls.TextBox)
-                {
-                    var tb = (System.Windows.Controls.TextBox)child;
-                    if (tb != consoleLogs)
-                    {
-                        tb.Background = brushCardBg;
-                        tb.Foreground = brushTextMain;
-                        tb.BorderBrush = brushBorder;
-                    }
-                }
-                else if (child is System.Windows.Controls.Button)
-                {
-                    var btn = (System.Windows.Controls.Button)child;
-                    if (btn.Tag != null && btn.Tag.ToString() == "secondary")
-                    {
-                        btn.Background = isDarkTheme ? GetBrush("rgba(255,255,255,0.05)") : GetBrush("rgba(15,23,42,0.05)");
-                        btn.BorderBrush = brushBorder;
-                        btn.Foreground = brushTextMain;
-                    }
-                }
 
-                // Recurse down visual tree
-                UpdateChildControls(child);
+                    // Recurse down logical tree
+                    UpdateChildControls(child);
+                }
             }
         }
 

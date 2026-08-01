@@ -11,7 +11,7 @@ if (-not (Test-Path $sourcePath)) {
     Read-Host "Press enter to exit..."
     exit
 }
-$sourceCode = Get-Content $sourcePath -Raw
+$sourceCode = [System.IO.File]::ReadAllText($sourcePath, [System.Text.Encoding]::UTF8)
 
 # Link WPF and Windows Forms references
 $assemblies = @(
