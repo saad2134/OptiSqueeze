@@ -32,9 +32,15 @@ namespace OptiSqueeze
 {
     public class Program
     {
+        public static string AppDir = AppDomain.CurrentDomain.BaseDirectory;
+
         [STAThread]
-        public static void Main()
+        public static void Main(string[] args)
         {
+            if (args != null && args.Length > 0 && !string.IsNullOrEmpty(args[0]))
+            {
+                AppDir = args[0];
+            }
             var app = new System.Windows.Application();
             app.Run(new MainWindow());
         }
@@ -91,11 +97,11 @@ namespace OptiSqueeze
         private NotifyIcon trayIcon = null;
 
         // Path definitions
-        private static string appDir = AppDomain.CurrentDomain.BaseDirectory;
-        private static string binDir = System.IO.Path.Combine(appDir, "bin");
-        private static string ffmpegPath = System.IO.Path.Combine(binDir, "ffmpeg.exe");
-        private static string ffprobePath = System.IO.Path.Combine(binDir, "ffprobe.exe");
-        private static string historyPath = System.IO.Path.Combine(appDir, ".compress_history");
+        private static string appDir = Program.AppDir;
+        private static string binDir = System.IO.Path.Combine(Program.AppDir, "bin");
+        private static string ffmpegPath = System.IO.Path.Combine(System.IO.Path.Combine(Program.AppDir, "bin"), "ffmpeg.exe");
+        private static string ffprobePath = System.IO.Path.Combine(System.IO.Path.Combine(Program.AppDir, "bin"), "ffprobe.exe");
+        private static string historyPath = System.IO.Path.Combine(Program.AppDir, ".compress_history");
 
         // WPF UI Layout references
         private System.Windows.Controls.Grid sidebarGrid;
