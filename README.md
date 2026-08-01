@@ -1,30 +1,33 @@
 # OptiSqueeze 🎬💾
 
-OptiSqueeze is a premium Windows GUI desktop application built with Electron for reducing video file sizes by transcoding them into modern, highly efficient H.265 (HEVC) formats. It detects your GPU capabilities dynamically, running hardware-accelerated encodings whenever possible, and features a state-of-the-art glassmorphic user interface.
+OptiSqueeze is an ultra-lightweight (135 KB) native Windows desktop application built with C# and Windows Presentation Foundation (WPF) for reducing video file sizes by transcoding them into modern, highly efficient H.265 (HEVC) formats. 
+
+By running on native Windows frameworks, it eliminates heavy browser runtimes (like Electron) and startup DLL errors. It starts up instantly, uses minimal memory, and has zero external dependencies.
 
 ---
 
 ## Key Features
 
+- **Lightweight Standalone Binary**: The compiled app is a single, portable executable (`OptiSqueeze.exe`) of just **135 KB**.
 - **Drag & Drop Workspace**: Drop folders or multiple individual files to immediately queue them up.
 - **Dynamic Hardware Acceleration**: Automatically detects and leverages:
   - **NVIDIA NVENC** H.265 (Fastest GPU Transcoding)
   - **Intel QuickSync (QSV)** H.265
   - **AMD AMF** H.265
   - **CPU libx265** (High-efficiency software fallback)
-- **Live Encoding Feedback**: Real-time progress bars, transcoding speeds (e.g. `3.5x`), frame rates (FPS), and estimated time remaining (ETA).
-- **Dashboard & Analytics**: Track how much total disk space you've reclaimed, files processed, and your average compression ratio.
-- **Flexible Settings**:
-  - Constant Rate Factor (CRF) quality slider (values 18 to 32).
-  - CPU Preset speed selection.
-  - Audio handling options: Copy streams natively (0% loss) or re-encode to compact AAC stereo.
-  - Choose to overwrite original files or append a `_compressed` suffix.
-- **Smart Optimization Filters**:
+- **Live Encoding Feedback**: Real-time progress percentage, transcoding speed multipliers (e.g., `4.5x`), frame rates (FPS), and estimated time remaining (ETA).
+- **Dashboard Analytics**: Track how many total files you've processed, total space saved, and your average size reduction ratio.
+- **Background Minimization**: 
+  - If you close the window while transcoding, OptiSqueeze asks to minimize to the Windows System Tray to finish in the background.
+  - Shows a balloon notification when tasks complete in the background.
+  - Double-click the tray icon to restore the window.
+- **Smart Skip Filters**:
   - Skip files that are already compressed with modern formats (`HEVC/H.265`, `AV1`, `VP9`).
   - Skip previously successfully compressed files based on your history database.
-  - Skips replacement if the compressed output file is larger than the original (retaining original quality).
-- **Embedded Logging Console**: Collapsible raw terminal log feed straight from the active FFmpeg thread.
-- **Built-in Auto-Installer**: The application automatically checks for local FFmpeg binaries and can download/extract them with a single click.
+  - Skips replacement if the compressed output file is larger than the original.
+- **Embedded Logging Console**: Collapsible log drawer showing raw FFmpeg stdout/stderr diagnostics.
+- **Hidden Database**: Saves successful transcodes in a hidden, extensionless history file named `.compress_history` (using Windows hidden attributes).
+- **Auto-Installer**: Natively checks for local FFmpeg binaries and downloads/extracts them with a single click if they are missing.
 
 ---
 
@@ -39,60 +42,36 @@ video-transcoder-gui/
 │   ├── codec_from_h264_to_h265.ps1
 │   └── codec_from_h264_to_h265.bat
 ├── src/                       # Application code
-│   ├── main.js                # Electron main thread
-│   ├── preload.js             # IPC security bridge
-│   ├── renderer.js            # Frontend logic
-│   ├── index.html             # UI Structure
-│   └── style.css              # Glassmorphic UI styles
+│   ├── OptiSqueeze.cs         # Main C# WPF code (UI + logic)
+│   ├── icon.ico               # Windows application icon
+│   └── icon.png               # Custom icon PNG
 ├── .gitignore
-├── compress_history.json      # Cache of successfully encoded files
-└── package.json               # Build configurations & dependencies
+├── .compress_history          # Hidden extensionless history (JSON logs)
+├── build.bat                  # Compiler script invoking csc.exe
+└── OptiSqueeze.exe            # Lightweight compiled application (135 KB)
 ```
 
 ---
 
-## Installation & Setup
+## Compilation
 
-Ensure you have [Node.js (v18+)](https://nodejs.org) installed on your system.
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/yourusername/optisqueeze.git
-   cd optisqueeze
+To compile or build the application from source code:
+1. Double-click `build.bat` or run it in your terminal:
+   ```cmd
+   build.bat
    ```
-
-2. **Install project dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **FFmpeg Binary Configuration**:
-   When launching the app, it will look for `ffmpeg.exe` and `ffprobe.exe` inside the `/bin` directory. If they are missing:
-   - Click the **Download & Setup Automatically** button in the startup screen to download them.
-   - Alternatively, copy your existing files `ffmpeg.exe` and `ffprobe.exe` and paste them into `/bin`.
+This utilizes Windows' built-in C# compiler (`csc.exe`) located in `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`. No .NET SDKs, package managers (like npm/pip), or setup configurations are required.
 
 ---
 
-## Running the Application
+## Setup & Binaries
 
-To run the application in development mode:
-```bash
-npm start
-```
-
----
-
-## Packaging into a Portable Executable
-
-To bundle the application into a standalone Windows `.exe` installer or portable executable (managed inside the `dist/` directory):
-```bash
-npm run build
-```
-
-This uses `electron-builder` under the hood, matching the production configs defined in `package.json`.
+When launching the app, it will look for `ffmpeg.exe` and `ffprobe.exe` inside the `/bin` directory. If they are missing:
+- Click the **Download & Setup Automatically** button in the startup screen to download them.
+- Alternatively, copy your existing files `ffmpeg.exe` and `ffprobe.exe` and paste them into `/bin`.
 
 ---
 
 ## License
 
-This project is open-source and licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
