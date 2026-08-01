@@ -1,0 +1,41 @@
+{
+  "name": "optisqueeze",
+  "version": "1.0.0",
+  "description": "A premium Windows GUI application for compressing video file sizes by transcoding them to modern, highly efficient codecs (H.265/HEVC).",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "keywords": [
+    "video",
+    "compressor",
+    "transcoder",
+    "ffmpeg",
+    "h265",
+    "hevc",
+    "gpu",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.optisqueeze.app",
+    "productName": "OptiSqueeze",
+    "win": {
+      "target": "portable"
+    },
+    "files": [
+      "src/**/*",
+      "bin/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}

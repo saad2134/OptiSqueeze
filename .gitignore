@@ -1,0 +1,6 @@
+node_modules/
+bin/*.exe
+.compress_history.json
+dist/
+*.log
+.DS_Store
