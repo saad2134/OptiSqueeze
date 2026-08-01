@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
 const https = require('https');
-const admZip = require('adm-zip'); // Note: we'll add adm-zip or use PowerShell on Windows to extract.
 // Since we are on Windows, we can use built-in Expand-Archive via PowerShell, avoiding extra node dependency issues!
 
 let mainWindow;
