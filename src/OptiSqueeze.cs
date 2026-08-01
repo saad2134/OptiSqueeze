@@ -73,6 +73,15 @@ namespace OptiSqueeze
         private bool isCancelled = false;
         private string activeTab = "compressor";
 
+        // Theme Settings
+        private bool isDarkTheme = true;
+        private SolidColorBrush brushBg;
+        private SolidColorBrush brushSidebarBg;
+        private SolidColorBrush brushCardBg;
+        private SolidColorBrush brushBorder;
+        private SolidColorBrush brushTextMain;
+        private SolidColorBrush brushTextMuted;
+
         // Hardware capabilities
         private bool nvencAvailable = false;
         private bool qsvAvailable = false;
@@ -88,7 +97,12 @@ namespace OptiSqueeze
         private static string ffprobePath = System.IO.Path.Combine(binDir, "ffprobe.exe");
         private static string historyPath = System.IO.Path.Combine(appDir, ".compress_history");
 
-        // WPF UI Panels
+        // WPF UI Layout references
+        private System.Windows.Controls.Grid sidebarGrid;
+        private Border sidebarSeparator;
+        private System.Windows.Controls.TextBlock brandText;
+        private System.Windows.Controls.Button btnThemeToggle;
+
         private Border paneCompressor;
         private Border paneHistory;
         private Border paneSettings;
@@ -151,7 +165,6 @@ namespace OptiSqueeze
             this.MinWidth = 850;
             this.MinHeight = 650;
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            this.Background = GetBrush("#080b11");
 
             // Setup Custom Icon
             string iconPath = System.IO.Path.Combine(appDir, "src", "icon.png");
@@ -159,6 +172,9 @@ namespace OptiSqueeze
             {
                 try { this.Icon = new BitmapImage(new Uri(iconPath)); } catch {}
             }
+
+            // Initialize theme colors
+            UpdateThemeBrushes();
 
             // Drag and drop events
             this.AllowDrop = true;
@@ -170,11 +186,145 @@ namespace OptiSqueeze
             // Build Layout
             BuildLayout();
 
+            // Apply Theme
+            ApplyTheme();
+
             // Check for binaries on background start
             Dispatcher.BeginInvoke(new Action(async () => {
                 await CheckAndSetupBinaries();
             }), DispatcherPriority.Background);
         }
+
+        #region Theme Application & Management
+        private void UpdateThemeBrushes()
+        {
+            if (isDarkTheme)
+            {
+                brushBg = GetBrush("#080b11");
+                brushSidebarBg = GetBrush("#0d121c");
+                brushCardBg = GetBrush("rgba(22,30,47,0.7)");
+                brushBorder = GetBrush("rgba(255,255,255,0.06)");
+                brushTextMain = Brushes.White;
+                brushTextMuted = GetBrush("#94a3b8");
+            }
+            else
+            {
+                brushBg = GetBrush("#f8fafc"); // Slate 50
+                brushSidebarBg = GetBrush("#f1f5f9"); // Slate 100
+                brushCardBg = GetBrush("#ffffff"); // Pure white
+                brushBorder = GetBrush("rgba(15,23,42,0.08)"); // Subtle dark border
+                brushTextMain = GetBrush("#0f172a"); // Slate 900
+                brushTextMuted = GetBrush("#475569"); // Slate 600
+            }
+        }
+
+        private void ApplyTheme()
+        {
+            UpdateThemeBrushes();
+
+            // Apply to main window
+            this.Background = brushBg;
+
+            // Apply to sidebar layout
+            sidebarGrid.Background = brushSidebarBg;
+            sidebarSeparator.BorderBrush = brushBorder;
+
+            // Update Tab button states
+            SwitchTab(activeTab);
+
+            // Update overlay downloader background
+            overlayBinaries.Background = isDarkTheme ? GetBrush("rgba(5,7,11,0.96)") : GetBrush("rgba(241,245,249,0.96)");
+
+            // Update badge themes
+            if (badgeNvenc != null) SetBadgeActive(badgeNvenc, nvencAvailable);
+            if (badgeQsv != null) SetBadgeActive(badgeQsv, qsvAvailable);
+            if (badgeAmf != null) SetBadgeActive(badgeAmf, amfAvailable);
+
+            // Traverse the tree recursively to update dynamic UI controls
+            UpdateChildControls(this);
+        }
+
+        private void UpdateChildControls(DependencyObject parent)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+
+                if (child is TextBlock)
+                {
+                    var tb = (TextBlock)child;
+                    // Keep brand header text color custom, as well as success/error colors
+                    if (tb != brandText && tb.Foreground != GetBrush("#06b6d4") && tb.Foreground != GetBrush("#10b981") && tb.Foreground != GetBrush("#ef4444") && tb.Foreground != GetBrush("#7c3aed"))
+                    {
+                        if (tb.Tag != null && tb.Tag.ToString() == "muted")
+                        {
+                            tb.Foreground = brushTextMuted;
+                        }
+                        else
+                        {
+                            tb.Foreground = brushTextMain;
+                        }
+                    }
+                }
+                else if (child is Border)
+                {
+                    var border = (Border)child;
+                    if (border.Tag != null)
+                    {
+                        string tag = border.Tag.ToString();
+                        if (tag == "card")
+                        {
+                            border.Background = brushCardBg;
+                            border.BorderBrush = brushBorder;
+                        }
+                    }
+                }
+                else if (child is System.Windows.Controls.CheckBox)
+                {
+                    var cb = (System.Windows.Controls.CheckBox)child;
+                    cb.Foreground = brushTextMain;
+                }
+                else if (child is System.Windows.Controls.ListView)
+                {
+                    var lv = (System.Windows.Controls.ListView)child;
+                    lv.Background = brushSidebarBg;
+                    lv.Foreground = brushTextMain;
+                    lv.BorderBrush = brushBorder;
+                }
+                else if (child is System.Windows.Controls.TextBox)
+                {
+                    var tb = (System.Windows.Controls.TextBox)child;
+                    if (tb != consoleLogs)
+                    {
+                        tb.Background = brushCardBg;
+                        tb.Foreground = brushTextMain;
+                        tb.BorderBrush = brushBorder;
+                    }
+                }
+                else if (child is System.Windows.Controls.Button)
+                {
+                    var btn = (System.Windows.Controls.Button)child;
+                    if (btn.Tag != null && btn.Tag.ToString() == "secondary")
+                    {
+                        btn.Background = isDarkTheme ? GetBrush("rgba(255,255,255,0.05)") : GetBrush("rgba(15,23,42,0.05)");
+                        btn.BorderBrush = brushBorder;
+                        btn.Foreground = brushTextMain;
+                    }
+                }
+
+                // Recurse down visual tree
+                UpdateChildControls(child);
+            }
+        }
+
+        private void ToggleTheme(object sender, RoutedEventArgs e)
+        {
+            isDarkTheme = !isDarkTheme;
+            btnThemeToggle.Content = isDarkTheme ? "Theme: Dark 🌙" : "Theme: Light ☀️";
+            ApplyTheme();
+        }
+        #endregion
 
         #region UI Layout Builders
         private void BuildLayout()
@@ -184,22 +334,22 @@ namespace OptiSqueeze
             mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             this.Content = mainGrid;
 
-            // Sidebar Grid
-            var sidebar = new System.Windows.Controls.Grid { Background = GetBrush("#0d121c") };
-            System.Windows.Controls.Grid.SetColumn(sidebar, 0);
-            mainGrid.Children.Add(sidebar);
+            // Sidebar Grid reference
+            sidebarGrid = new System.Windows.Controls.Grid();
+            System.Windows.Controls.Grid.SetColumn(sidebarGrid, 0);
+            mainGrid.Children.Add(sidebarGrid);
 
             // Add thin separator line
-            var sep = new Border { BorderBrush = GetBrush("rgba(255,255,255,0.06)"), BorderThickness = new Thickness(0, 0, 1, 0) };
-            System.Windows.Controls.Grid.SetColumn(sep, 0);
-            mainGrid.Children.Add(sep);
+            sidebarSeparator = new Border { BorderThickness = new Thickness(0, 0, 1, 0) };
+            System.Windows.Controls.Grid.SetColumn(sidebarSeparator, 0);
+            mainGrid.Children.Add(sidebarSeparator);
 
             // Sidebar Content Stack
             var sidebarStack = new StackPanel { Margin = new Thickness(16, 24, 16, 24) };
-            sidebar.Children.Add(sidebarStack);
+            sidebarGrid.Children.Add(sidebarStack);
 
             // Brand Label
-            var brandText = new TextBlock
+            brandText = new TextBlock
             {
                 Text = "OptiSqueeze",
                 FontSize = 24,
@@ -229,7 +379,14 @@ namespace OptiSqueeze
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Margin = new Thickness(16, 0, 16, 24)
             };
-            sidebar.Children.Add(footerStack);
+            sidebarGrid.Children.Add(footerStack);
+
+            // Theme Toggle Button
+            btnThemeToggle = CreateNormalButton("Theme: Dark 🌙", false);
+            btnThemeToggle.Height = 36;
+            btnThemeToggle.Margin = new Thickness(0, 0, 0, 24);
+            btnThemeToggle.Click += ToggleTheme;
+            footerStack.Children.Add(btnThemeToggle);
 
             var hwTitle = new TextBlock
             {
@@ -237,7 +394,8 @@ namespace OptiSqueeze
                 FontSize = 10,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#64748b"),
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0, 0, 0, 8),
+                Tag = "muted"
             };
             footerStack.Children.Add(hwTitle);
 
@@ -292,15 +450,11 @@ namespace OptiSqueeze
                 Content = label,
                 Height = 44,
                 Margin = new Thickness(0, 0, 0, 8),
-                Background = isActive ? GetBrush("rgba(124,58,237,0.12)") : Brushes.Transparent,
-                BorderBrush = isActive ? GetBrush("rgba(124,58,237,0.4)") : Brushes.Transparent,
-                BorderThickness = new Thickness(isActive ? 1 : 0),
-                Foreground = isActive ? Brushes.White : GetBrush("#94a3b8"),
+                Cursor = System.Windows.Input.Cursors.Hand,
                 FontSize = 15,
                 FontWeight = FontWeights.Medium,
                 HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
-                Padding = new Thickness(16, 0, 0, 0),
-                Cursor = System.Windows.Input.Cursors.Hand
+                Padding = new Thickness(16, 0, 0, 0)
             };
 
             // Modern Flat Button Style template
@@ -360,9 +514,9 @@ namespace OptiSqueeze
             }
             else
             {
-                badge.Background = GetBrush("rgba(255,255,255,0.03)");
+                badge.Background = isDarkTheme ? GetBrush("rgba(255,255,255,0.03)") : GetBrush("rgba(15,23,42,0.03)");
                 badge.BorderBrush = Brushes.Transparent;
-                txt.Foreground = GetBrush("#475569");
+                txt.Foreground = brushTextMuted;
             }
         }
 
@@ -385,7 +539,6 @@ namespace OptiSqueeze
                 Text = "Compress Videos",
                 FontSize = 28,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 6)
             };
             headerStack.Children.Add(title);
@@ -394,7 +547,7 @@ namespace OptiSqueeze
             {
                 Text = "Convert videos to highly compressed H.265 (HEVC) format to reclaim disk space.",
                 FontSize = 14,
-                Foreground = GetBrush("#94a3b8")
+                Tag = "muted"
             };
             headerStack.Children.Add(sub);
 
@@ -406,12 +559,11 @@ namespace OptiSqueeze
             // Dropzone Border
             dropZone = new Border
             {
-                BorderBrush = GetBrush("rgba(255,255,255,0.1)"),
                 BorderThickness = new Thickness(2),
-                Background = GetBrush("rgba(22,30,47,0.7)"),
                 CornerRadius = new CornerRadius(16),
                 Padding = new Thickness(36),
-                Cursor = System.Windows.Input.Cursors.Hand
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Tag = "card"
             };
             workspaceGrid.Children.Add(dropZone);
 
@@ -423,7 +575,6 @@ namespace OptiSqueeze
                 Text = "Drag & Drop Video Files or Folders Here",
                 FontSize = 18,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = Brushes.White,
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 8)
             };
@@ -433,9 +584,9 @@ namespace OptiSqueeze
             {
                 Text = "Supports MP4, MKV, AVI, MOV, FLV, and WebM formats",
                 FontSize = 13,
-                Foreground = GetBrush("#94a3b8"),
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 24)
+                Margin = new Thickness(0, 0, 0, 24),
+                Tag = "muted"
             };
             dzStack.Children.Add(dzSub);
 
@@ -463,7 +614,7 @@ namespace OptiSqueeze
             System.Windows.Controls.Grid.SetRow(qHeader, 0);
             queuePanel.Children.Add(qHeader);
 
-            queueCountText = new TextBlock { Text = "0 Files Loaded", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
+            queueCountText = new TextBlock { Text = "0 Files Loaded", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
             qHeader.Children.Add(queueCountText);
 
             btnClearQueue = new System.Windows.Controls.Button
@@ -480,13 +631,7 @@ namespace OptiSqueeze
             qHeader.Children.Add(btnClearQueue);
 
             // Queue ListView
-            queueListView = new System.Windows.Controls.ListView
-            {
-                Background = GetBrush("#0d121c"),
-                BorderBrush = GetBrush("rgba(255,255,255,0.06)"),
-                Foreground = Brushes.White,
-                Margin = new Thickness(0, 0, 0, 12)
-            };
+            queueListView = new System.Windows.Controls.ListView { Margin = new Thickness(0, 0, 0, 12) };
             System.Windows.Controls.Grid.SetRow(queueListView, 1);
             queuePanel.Children.Add(queueListView);
 
@@ -509,7 +654,7 @@ namespace OptiSqueeze
             var sizeStack = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             actionBar.Children.Add(sizeStack);
 
-            sizeStack.Children.Add(new TextBlock { Text = "Total Input Size: ", Foreground = GetBrush("#94a3b8") });
+            sizeStack.Children.Add(new TextBlock { Text = "Total Input Size: ", Tag = "muted" });
             totalInputSizeText = new TextBlock { Text = "0 MB", FontWeight = FontWeights.Bold, Foreground = GetBrush("#06b6d4") };
             sizeStack.Children.Add(totalInputSizeText);
 
@@ -521,9 +666,9 @@ namespace OptiSqueeze
             actBtnStack.Children.Add(btnStart);
 
             btnCancel = CreateNormalButton("Cancel Process", false);
-            btnCancel.Foreground = Brushes.White;
             btnCancel.Background = GetBrush("rgba(239, 68, 68, 0.2)");
             btnCancel.BorderBrush = GetBrush("rgba(239, 68, 68, 0.4)");
+            btnCancel.Foreground = GetBrush("#ef4444");
             btnCancel.Visibility = Visibility.Collapsed;
             btnCancel.Click += (s, e) => CancelTranscodingSession();
             actBtnStack.Children.Add(btnCancel);
@@ -595,7 +740,6 @@ namespace OptiSqueeze
                 Text = "Dashboard & Analytics",
                 FontSize = 28,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 6)
             });
 
@@ -603,7 +747,7 @@ namespace OptiSqueeze
             {
                 Text = "Performance statistics and session storage tracking.",
                 FontSize = 14,
-                Foreground = GetBrush("#94a3b8")
+                Tag = "muted"
             });
 
             // Statistics Grid Row 1
@@ -646,7 +790,6 @@ namespace OptiSqueeze
                 Text = "Completed Conversions Log",
                 FontSize = 16,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = Brushes.White,
                 VerticalAlignment = VerticalAlignment.Center
             });
 
@@ -664,12 +807,7 @@ namespace OptiSqueeze
             logHead.Children.Add(btnClearHistory);
 
             // ListView
-            historyListView = new System.Windows.Controls.ListView
-            {
-                Background = GetBrush("#0d121c"),
-                BorderBrush = GetBrush("rgba(255,255,255,0.06)"),
-                Foreground = Brushes.White
-            };
+            historyListView = new System.Windows.Controls.ListView();
             System.Windows.Controls.Grid.SetRow(historyListView, 1);
             logGrid.Children.Add(historyListView);
 
@@ -690,21 +828,19 @@ namespace OptiSqueeze
         {
             var b = new Border
             {
-                Background = GetBrush("rgba(22,30,47,0.7)"),
-                BorderBrush = GetBrush("rgba(255,255,255,0.06)"),
-                BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(20),
-                Margin = new Thickness(4)
+                Margin = new Thickness(4),
+                Tag = "card"
             };
 
             var stack = new StackPanel();
             b.Child = stack;
 
-            var t = new TextBlock { Text = title, FontSize = 12, Foreground = GetBrush("#94a3b8"), Margin = new Thickness(0, 0, 0, 6) };
+            var t = new TextBlock { Text = title, FontSize = 12, Margin = new Thickness(0, 0, 0, 6), Tag = "muted" };
             stack.Children.Add(t);
 
-            valText = new TextBlock { Text = defVal, FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.White };
+            valText = new TextBlock { Text = defVal, FontSize = 24, FontWeight = FontWeights.Bold };
             stack.Children.Add(valText);
 
             return b;
@@ -728,7 +864,6 @@ namespace OptiSqueeze
                 Text = "Compression Settings",
                 FontSize = 28,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 6)
             });
 
@@ -736,7 +871,7 @@ namespace OptiSqueeze
             {
                 Text = "Tune encoder preferences, quality variables, and folder replacement scripts.",
                 FontSize = 14,
-                Foreground = GetBrush("#94a3b8")
+                Tag = "muted"
             });
 
             // Settings Panel Stack
@@ -772,7 +907,7 @@ namespace OptiSqueeze
 
             var sliderHeader = new System.Windows.Controls.Grid { Margin = new Thickness(0, 16, 0, 4) };
             gvStack.Children.Add(sliderHeader);
-            sliderHeader.Children.Add(new TextBlock { Text = "Constant Quality Factor (CRF / CQ)", Foreground = Brushes.White, FontWeight = FontWeights.Medium });
+            sliderHeader.Children.Add(new TextBlock { Text = "Constant Quality Factor (CRF / CQ)", FontWeight = FontWeights.Medium });
             textCrfVal = new TextBlock { Text = "24", Foreground = GetBrush("#06b6d4"), FontWeight = FontWeights.Bold, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
             sliderHeader.Children.Add(textCrfVal);
 
@@ -790,8 +925,8 @@ namespace OptiSqueeze
 
             var sliderLabels = new System.Windows.Controls.Grid();
             gvStack.Children.Add(sliderLabels);
-            sliderLabels.Children.Add(new TextBlock { Text = "18 (Highest Quality / Large)", FontSize = 10, Foreground = GetBrush("#64748b") });
-            sliderLabels.Children.Add(new TextBlock { Text = "32 (Lowest Quality / Small)", FontSize = 10, Foreground = GetBrush("#64748b"), HorizontalAlignment = System.Windows.HorizontalAlignment.Right });
+            sliderLabels.Children.Add(new TextBlock { Text = "18 (Highest Quality / Large)", FontSize = 10, Tag = "muted" });
+            sliderLabels.Children.Add(new TextBlock { Text = "32 (Lowest Quality / Small)", FontSize = 10, Tag = "muted", HorizontalAlignment = System.Windows.HorizontalAlignment.Right });
 
             comboPreset = CreateSettingsCombo(new[] {
                 "Ultrafast CPU Preset", "Superfast", "Veryfast", "Faster", "Fast", "Medium (Recommended balance)", "Slow"
@@ -803,10 +938,7 @@ namespace OptiSqueeze
             // Group 2: Audio & Output Config
             var groupAudio = CreateSettingsGroup("Audio & Target Folder Rules");
             setStack.Children.Add(groupAudio);
-            var gaStack = (StackPanel)groupVideo.Child;
-
-            // Wait, we add it to gaStack, not groupVideo.Child
-            gaStack = (StackPanel)groupAudio.Child;
+            var gaStack = (StackPanel)groupAudio.Child;
 
             gaStack.Children.Add(CreateLabel("Audio Processing Mode"));
             comboAudio = CreateSettingsCombo(new[] {
@@ -840,12 +972,10 @@ namespace OptiSqueeze
         {
             var b = new Border
             {
-                Background = GetBrush("rgba(22,30,47,0.7)"),
-                BorderBrush = GetBrush("rgba(255,255,255,0.06)"),
-                BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(16),
                 Padding = new Thickness(24),
-                Margin = new Thickness(0, 0, 0, 20)
+                Margin = new Thickness(0, 0, 0, 20),
+                Tag = "card"
             };
 
             var stack = new StackPanel();
@@ -869,7 +999,6 @@ namespace OptiSqueeze
             return new TextBlock
             {
                 Text = text,
-                Foreground = Brushes.White,
                 FontWeight = FontWeights.Medium,
                 Margin = new Thickness(0, 0, 0, 6)
             };
@@ -901,7 +1030,6 @@ namespace OptiSqueeze
             return new System.Windows.Controls.CheckBox
             {
                 Content = label,
-                Foreground = Brushes.White,
                 IsChecked = defVal,
                 Margin = new Thickness(0, 8, 0, 8),
                 Cursor = System.Windows.Input.Cursors.Hand
@@ -913,18 +1041,19 @@ namespace OptiSqueeze
             var btn = new System.Windows.Controls.Button
             {
                 Content = text,
-                Height = 36,
-                Padding = new Thickness(20, 0, 20, 0),
+                MinHeight = 38,
+                Padding = new Thickness(24, 8, 24, 8), // Clean horizontal padding
                 Cursor = System.Windows.Input.Cursors.Hand,
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 13,
-                Foreground = Brushes.White,
+                Foreground = isPrimary ? Brushes.White : Brushes.White, // overwritten dynamic brush in walker
                 BorderThickness = new Thickness(1),
                 Background = isPrimary ? GetBrush("rgba(124,58,237,0.85)") : GetBrush("rgba(255,255,255,0.05)"),
                 BorderBrush = isPrimary ? GetBrush("rgba(124,58,237,0.4)") : GetBrush("rgba(255,255,255,0.1)"),
+                Tag = isPrimary ? "primary" : "secondary"
             };
 
-            // Custom Button template for flat UI
+            // Custom Button template for flat UI supporting padding
             var template = new ControlTemplate(typeof(System.Windows.Controls.Button));
             var factory = new FrameworkElementFactory(typeof(Border));
             factory.Name = "border";
@@ -932,6 +1061,7 @@ namespace OptiSqueeze
             factory.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(System.Windows.Controls.Button.BorderBrushProperty));
             factory.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(System.Windows.Controls.Button.BorderThicknessProperty));
             factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+            factory.SetValue(Border.PaddingProperty, new TemplateBindingExtension(System.Windows.Controls.Button.PaddingProperty)); // Binds control padding!
 
             var contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
             contentPresenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
@@ -946,10 +1076,7 @@ namespace OptiSqueeze
 
         private System.Windows.Controls.Grid BuildBinaryOverlay()
         {
-            var grid = new System.Windows.Controls.Grid
-            {
-                Background = GetBrush("rgba(5,7,11,0.96)")
-            };
+            var grid = new System.Windows.Controls.Grid();
 
             var stack = new StackPanel
             {
@@ -964,7 +1091,6 @@ namespace OptiSqueeze
                 Text = "FFmpeg Binaries Missing",
                 FontSize = 24,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 12)
             };
@@ -974,11 +1100,11 @@ namespace OptiSqueeze
             {
                 Text = "OptiSqueeze requires FFmpeg & FFprobe to transcode and query video codec formats. These components are missing from your project binaries directory.",
                 FontSize = 13,
-                Foreground = GetBrush("#94a3b8"),
                 TextWrapping = TextWrapping.Wrap,
                 TextAlignment = TextAlignment.Center,
                 LineHeight = 20,
-                Margin = new Thickness(0, 0, 0, 24)
+                Margin = new Thickness(0, 0, 0, 24),
+                Tag = "muted"
             };
             stack.Children.Add(info);
 
@@ -1021,8 +1147,8 @@ namespace OptiSqueeze
             {
                 Text = "This will download the official GyanD FFmpeg essentials release and extract the executable files.",
                 FontSize = 11,
-                Foreground = GetBrush("#64748b"),
-                TextAlignment = TextAlignment.Center
+                TextAlignment = TextAlignment.Center,
+                Tag = "muted"
             });
 
             return grid;
@@ -1058,10 +1184,20 @@ namespace OptiSqueeze
 
         private void SetTabBtnState(System.Windows.Controls.Button btn, bool active)
         {
-            btn.Background = active ? GetBrush("rgba(124,58,237,0.12)") : Brushes.Transparent;
-            btn.BorderBrush = active ? GetBrush("rgba(124,58,237,0.4)") : Brushes.Transparent;
-            btn.BorderThickness = new Thickness(active ? 1 : 0);
-            btn.Foreground = active ? Brushes.White : GetBrush("#94a3b8");
+            if (active)
+            {
+                btn.Background = isDarkTheme ? GetBrush("rgba(124,58,237,0.12)") : GetBrush("rgba(124,58,237,0.08)");
+                btn.BorderBrush = GetBrush("rgba(124,58,237,0.4)");
+                btn.BorderThickness = new Thickness(1);
+                btn.Foreground = isDarkTheme ? Brushes.White : GetBrush("#7c3aed");
+            }
+            else
+            {
+                btn.Background = Brushes.Transparent;
+                btn.BorderBrush = Brushes.Transparent;
+                btn.BorderThickness = new Thickness(0);
+                btn.Foreground = brushTextMuted;
+            }
         }
         #endregion
 
