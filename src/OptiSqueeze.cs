@@ -1061,9 +1061,9 @@ namespace OptiSqueeze
             var cb = new System.Windows.Controls.ComboBox
             {
                 Height = 36,
-                Background = GetBrush("#111724"),
-                Foreground = Brushes.White,
-                BorderBrush = GetBrush("rgba(255,255,255,0.1)"),
+                Background = GetBrush("#f1f5f9"),
+                Foreground = GetBrush("#0f172a"),
+                BorderBrush = GetBrush("rgba(15,23,42,0.15)"),
                 Margin = new Thickness(0, 0, 0, 16),
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Padding = new Thickness(8, 0, 8, 0)
@@ -1071,7 +1071,12 @@ namespace OptiSqueeze
 
             foreach (var item in items)
             {
-                cb.Items.Add(new ComboBoxItem { Content = item, Foreground = Brushes.Black });
+                cb.Items.Add(new ComboBoxItem 
+                { 
+                    Content = item, 
+                    Foreground = GetBrush("#0f172a"),
+                    Background = Brushes.White
+                });
             }
             cb.SelectedIndex = 0;
             return cb;
