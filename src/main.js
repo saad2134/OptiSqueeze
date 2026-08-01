@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
@@ -8,13 +8,14 @@ const https = require('https');
 let mainWindow;
 let activeFFmpegProcess = null;
 let isCancelled = false;
+let tray = null;
 
 // Paths
 const appDir = app.isPackaged ? path.dirname(app.getPath('exe')) : app.getAppPath();
 const binDir = path.join(appDir, 'bin');
 const ffmpegPath = path.join(binDir, 'ffmpeg.exe');
 const ffprobePath = path.join(binDir, 'ffprobe.exe');
-const historyPath = path.join(appDir, 'compress_history.json');
+const historyPath = path.join(appDir, '.compress_history');
 
 // Ensure bin folder exists
 if (!fs.existsSync(binDir)) {
@@ -28,6 +29,7 @@ function createWindow() {
     minWidth: 850,
     minHeight: 650,
     title: "OptiSqueeze - Video Compressor & Encoder",
+    icon: path.join(__dirname, 'icon.png'),
     frame: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -38,8 +40,78 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   
-  // Open DevTools in dev mode if needed
-  // mainWindow.webContents.openDevTools();
+  // Warn/Minimize to tray on close if task is active
+  mainWindow.on('close', (e) => {
+    if (activeFFmpegProcess) {
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['Minimize to Tray & Continue', 'Cancel Task & Exit', 'Keep App Open'],
+        defaultId: 0,
+        cancelId: 2,
+        title: 'Compression Active',
+        message: 'OptiSqueeze is currently compressing videos.',
+        detail: 'Would you like to minimize the app to the system tray and continue in the background, or cancel the task and exit completely?'
+      });
+
+      if (choice === 0) {
+        e.preventDefault();
+        setupSystemTray();
+        mainWindow.hide();
+      } else if (choice === 1) {
+        if (activeFFmpegProcess) {
+          activeFFmpegProcess.kill('SIGINT');
+        }
+        app.exit(0);
+      } else {
+        e.preventDefault();
+      }
+    } else {
+      // No tasks running, close completely
+      app.quit();
+    }
+  });
+}
+
+function setupSystemTray() {
+  if (tray) return;
+  const iconPath = path.join(__dirname, 'icon.ico');
+  const fallbackIconPath = path.join(__dirname, 'icon.png');
+  
+  tray = new Tray(fs.existsSync(iconPath) ? iconPath : (fs.existsSync(fallbackIconPath) ? fallbackIconPath : path.join(__dirname, 'index.html')));
+  
+  const contextMenu = Menu.buildFromTemplate([
+    { 
+      label: 'Show OptiSqueeze', 
+      click: () => {
+        mainWindow.show();
+        if (tray) {
+          tray.destroy();
+          tray = null;
+        }
+      } 
+    },
+    { type: 'separator' },
+    { 
+      label: 'Quit App & Cancel Tasks', 
+      click: () => {
+        if (activeFFmpegProcess) {
+          activeFFmpegProcess.kill('SIGINT');
+        }
+        app.exit(0);
+      } 
+    }
+  ]);
+
+  tray.setToolTip('OptiSqueeze is compressing videos in the background...');
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    mainWindow.show();
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -51,11 +123,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    // Kill any active transcoder process on close
-    if (activeFFmpegProcess) {
-      activeFFmpegProcess.kill('SIGINT');
-    }
+  if (!tray) {
     app.quit();
   }
 });
@@ -459,6 +527,17 @@ ipcMain.handle('start-compression', async (event, { queue, settings }) => {
     }
   }
 
+  if (tray && !mainWindow.isVisible()) {
+    try {
+      tray.displayBalloon({
+        title: 'OptiSqueeze Tasks Complete',
+        content: `Finished compressing ${queue.length} files.`
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   return results;
 });
 
@@ -589,6 +668,9 @@ function addToHistory(item, historyMap) {
   const list = getHistoryList();
   list.unshift(item); // prepend new items
   fs.writeFileSync(historyPath, JSON.stringify(list, null, 2), 'utf8');
+  if (process.platform === 'win32') {
+    exec(`attrib +h "${historyPath}"`, (err) => { if (err) console.error("Hiding file failed", err); });
+  }
   historyMap[item.filePath] = item;
 }
 
@@ -598,6 +680,9 @@ ipcMain.handle('get-history', () => {
 
 ipcMain.handle('clear-history', () => {
   fs.writeFileSync(historyPath, JSON.stringify([], null, 2), 'utf8');
+  if (process.platform === 'win32') {
+    exec(`attrib +h "${historyPath}"`, (err) => { if (err) console.error("Hiding file failed", err); });
+  }
   return true;
 });
 

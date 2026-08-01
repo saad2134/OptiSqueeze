@@ -3,8 +3,11 @@ param(
 )
 
 # Configuration
-$ffmpegPath = "C:\Users\UwU\Downloads\ffmpeg.exe"
-$ffprobePath = "C:\Users\UwU\Downloads\ffprobe.exe"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ffmpegPath = Resolve-Path (Join-Path $scriptDir "..\bin\ffmpeg.exe") -ErrorAction SilentlyContinue
+$ffprobePath = Resolve-Path (Join-Path $scriptDir "..\bin\ffprobe.exe") -ErrorAction SilentlyContinue
+if (-not $ffmpegPath) { $ffmpegPath = Join-Path $scriptDir "..\bin\ffmpeg.exe" }
+if (-not $ffprobePath) { $ffprobePath = Join-Path $scriptDir "..\bin\ffprobe.exe" }
 $zipUrl = "https://github.com/GyanD/codexffmpeg/releases/download/6.1.1/ffmpeg-6.1.1-essentials_build.zip"
 
 # Prompt for directory if not passed as a parameter
@@ -62,7 +65,7 @@ $processedCount = 0
 $savedBytes = 0
 
 # Load processing history to prevent re-analyzing/re-compressing already processed files
-$historyFile = Join-Path $targetDir ".compress_history.txt"
+$historyFile = Join-Path $targetDir ".compress_history"
 $history = @{}
 if (Test-Path $historyFile) {
     Get-Content $historyFile | ForEach-Object { $history[$_] = $true }
@@ -88,6 +91,7 @@ foreach ($video in $videos) {
         Write-Host "Skipping (already compressed): $($video.Name) ($codec)" -ForegroundColor Gray
         # Add to history so we don't even run ffprobe on it next time
         $filePath | Out-File -FilePath $historyFile -Append -Encoding utf8
+        (Get-Item -LiteralPath $historyFile -Force).Attributes = 'Hidden'
         $history[$filePath] = $true
         continue
     }
@@ -138,6 +142,7 @@ foreach ($video in $videos) {
             
             # Add to history
             $filePath | Out-File -FilePath $historyFile -Append -Encoding utf8
+            (Get-Item -LiteralPath $historyFile -Force).Attributes = 'Hidden'
             $history[$filePath] = $true
             
             $percent = [Math]::Round(($saved / $oldSize) * 100, 1)
@@ -149,6 +154,7 @@ foreach ($video in $videos) {
             
             # Add to history so we don't try to re-compress it in future runs
             $filePath | Out-File -FilePath $historyFile -Append -Encoding utf8
+            (Get-Item -LiteralPath $historyFile -Force).Attributes = 'Hidden'
             $history[$filePath] = $true
         }
     } else {

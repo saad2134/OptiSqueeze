@@ -17,7 +17,7 @@
     "gpu",
     "electron"
   ],
-  "author": "",
+  "author": "@saad2134",
   "license": "MIT",
   "devDependencies": {
     "electron": "^31.0.0",
@@ -27,7 +27,9 @@
     "appId": "com.optisqueeze.app",
     "productName": "OptiSqueeze",
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "src/icon.ico",
+      "publisherName": "@saad2134"
     },
     "files": [
       "src/**/*",
