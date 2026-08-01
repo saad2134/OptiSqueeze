@@ -248,6 +248,49 @@ namespace OptiSqueeze
 
             // Traverse the tree recursively to update dynamic UI controls
             UpdateChildControls(this);
+
+            // Style ListView Column Headers
+            ApplyThemeToListViewHeaders();
+        }
+
+        private Style GetColumnHeaderStyle()
+        {
+            var headerStyle = new Style(typeof(GridViewColumnHeader));
+            headerStyle.Setters.Add(new Setter(System.Windows.Controls.Control.ForegroundProperty, brushTextMuted));
+            headerStyle.Setters.Add(new Setter(System.Windows.Controls.Control.BackgroundProperty, brushSidebarBg));
+            headerStyle.Setters.Add(new Setter(System.Windows.Controls.Control.BorderBrushProperty, brushBorder));
+            headerStyle.Setters.Add(new Setter(System.Windows.Controls.Control.FontWeightProperty, FontWeights.SemiBold));
+            headerStyle.Setters.Add(new Setter(System.Windows.Controls.Control.FontSizeProperty, 12.0));
+
+            var template = new ControlTemplate(typeof(GridViewColumnHeader));
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(System.Windows.Controls.Control.BackgroundProperty));
+            borderFactory.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(System.Windows.Controls.Control.BorderBrushProperty));
+            borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 1));
+            borderFactory.SetValue(Border.PaddingProperty, new Thickness(10, 8, 10, 8));
+
+            var cpFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            cpFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            cpFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Left);
+            borderFactory.AppendChild(cpFactory);
+
+            template.VisualTree = borderFactory;
+            headerStyle.Setters.Add(new Setter(System.Windows.Controls.Control.TemplateProperty, template));
+
+            return headerStyle;
+        }
+
+        private void ApplyThemeToListViewHeaders()
+        {
+            var style = GetColumnHeaderStyle();
+            if (queueListView != null && queueListView.View is System.Windows.Controls.GridView)
+            {
+                ((System.Windows.Controls.GridView)queueListView.View).ColumnHeaderContainerStyle = style;
+            }
+            if (historyListView != null && historyListView.View is System.Windows.Controls.GridView)
+            {
+                ((System.Windows.Controls.GridView)historyListView.View).ColumnHeaderContainerStyle = style;
+            }
         }
 
         private void UpdateChildControls(DependencyObject parent)
