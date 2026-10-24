@@ -96,6 +96,13 @@ namespace OptiSqueeze
         // Tray Icon
         private NotifyIcon trayIcon = null;
 
+        // Win32 Console Window Control
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
         // Path definitions
         private static string appDir = Program.AppDir;
         private static string binDir = System.IO.Path.Combine(Program.AppDir, "bin");
@@ -188,6 +195,19 @@ namespace OptiSqueeze
             this.DragOver += MainWindow_DragOver;
             this.Drop += MainWindow_Drop;
             this.Closing += MainWindow_Closing;
+
+            // Automatically hide launcher console once GUI is loaded and visible
+            this.Loaded += (s, e) => {
+                try
+                {
+                    IntPtr consoleHandle = GetConsoleWindow();
+                    if (consoleHandle != IntPtr.Zero)
+                    {
+                        ShowWindow(consoleHandle, 0); // 0 = SW_HIDE
+                    }
+                }
+                catch {}
+            };
 
             // Build Layout
             BuildLayout();

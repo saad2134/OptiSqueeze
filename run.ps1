@@ -26,8 +26,19 @@ $assemblies = @(
     "System.IO.Compression.FileSystem"
 )
 
-# Compile on-the-fly inside PowerShell
-Add-Type -TypeDefinition $sourceCode -ReferencedAssemblies $assemblies -ErrorAction Stop
+Write-Host "Launching OptiSqueeze..." -ForegroundColor Cyan
+Write-Host "Compiling native WPF application in-memory (Smart App Control bypass)..." -ForegroundColor Gray
 
-# Start the WPF window with custom base path context
-[OptiSqueeze.Program]::Main(@($scriptDir))
+try {
+    # Compile on-the-fly inside PowerShell
+    Add-Type -TypeDefinition $sourceCode -ReferencedAssemblies $assemblies -ErrorAction Stop
+
+    # Start the WPF window with custom base path context
+    [OptiSqueeze.Program]::Main(@($scriptDir))
+}
+catch {
+    Write-Host "`nFailed to launch OptiSqueeze:" -ForegroundColor Red
+    Write-Host $_.Exception.ToString() -ForegroundColor DarkRed
+    Read-Host "`nPress enter to exit..."
+    exit 1
+}
