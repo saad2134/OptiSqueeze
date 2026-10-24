@@ -1186,12 +1186,22 @@ namespace OptiSqueeze
             stack.Children.Add(info);
 
             binaryActions = new System.Windows.Controls.Grid();
+            binaryActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            binaryActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+            binaryActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             stack.Children.Add(binaryActions);
 
-            var btnDL = CreateNormalButton("Download & Setup Automatically (80MB)", true);
+            var btnDL = CreateNormalButton("Download Automatically", true);
             btnDL.Height = 44;
             btnDL.Click += async (s, e) => await DownloadBinariesAsync();
+            System.Windows.Controls.Grid.SetColumn(btnDL, 0);
             binaryActions.Children.Add(btnDL);
+
+            var btnBrowse = CreateNormalButton("Locate on PC", false);
+            btnBrowse.Height = 44;
+            btnBrowse.Click += (s, e) => LocateLocalBinaries();
+            System.Windows.Controls.Grid.SetColumn(btnBrowse, 2);
+            binaryActions.Children.Add(btnBrowse);
 
             binaryProgressPanel = new System.Windows.Controls.Grid { Visibility = Visibility.Collapsed };
             stack.Children.Add(binaryProgressPanel);
@@ -1222,7 +1232,7 @@ namespace OptiSqueeze
 
             dlStack.Children.Add(new TextBlock
             {
-                Text = "This will download the official GyanD FFmpeg essentials release and extract the executable files.",
+                Text = "Downloads from official release mirrors with automatic fallback redundancy.",
                 FontSize = 11,
                 TextAlignment = TextAlignment.Center,
                 Tag = "muted"
@@ -1514,18 +1524,169 @@ namespace OptiSqueeze
             return 0;
         }
 
+        private static string ResolveExecutable(string exeName)
+        {
+            try
+            {
+                // 1. Check local bin directory first
+                string localPath = System.IO.Path.Combine(binDir, exeName);
+                if (File.Exists(localPath)) return localPath;
+
+                // 2. Check application directory
+                string appDirPath = System.IO.Path.Combine(appDir, exeName);
+                if (File.Exists(appDirPath)) return appDirPath;
+
+                // 3. Check system PATH environment variable
+                string pathEnv = Environment.GetEnvironmentVariable("PATH");
+                if (!string.IsNullOrEmpty(pathEnv))
+                {
+                    string[] paths = pathEnv.Split(new char[] { System.IO.Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var p in paths)
+                    {
+                        try
+                        {
+                            string candidate = System.IO.Path.Combine(p.Trim(), exeName);
+                            if (File.Exists(candidate)) return candidate;
+                        }
+                        catch {}
+                    }
+                }
+
+                // 4. Check known Windows package managers & install paths
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                string programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+
+                string[] knownDirs = new string[]
+                {
+                    System.IO.Path.Combine(userProfile, "scoop", "shims"),
+                    System.IO.Path.Combine(programData, "chocolatey", "bin"),
+                    System.IO.Path.Combine(localAppData, "Microsoft", "WinGet", "Links"),
+                    @"C:\ffmpeg\bin",
+                    @"C:\ffmpeg",
+                    System.IO.Path.Combine(programFiles, "ffmpeg", "bin"),
+                    System.IO.Path.Combine(programFiles, "ffmpeg"),
+                    System.IO.Path.Combine(programFilesX86, "ffmpeg", "bin")
+                };
+
+                foreach (var dir in knownDirs)
+                {
+                    try
+                    {
+                        if (Directory.Exists(dir))
+                        {
+                            string candidate = System.IO.Path.Combine(dir, exeName);
+                            if (File.Exists(candidate)) return candidate;
+                        }
+                    }
+                    catch {}
+                }
+
+                // 5. Check Python Scripts folder if Python is installed
+                try
+                {
+                    string pythonBase = System.IO.Path.Combine(localAppData, "Programs", "Python");
+                    if (Directory.Exists(pythonBase))
+                    {
+                        foreach (var pyDir in Directory.GetDirectories(pythonBase))
+                        {
+                            string candidate = System.IO.Path.Combine(pyDir, "Scripts", exeName);
+                            if (File.Exists(candidate)) return candidate;
+                        }
+                    }
+                }
+                catch {}
+            }
+            catch {}
+
+            return null;
+        }
+
+        private async void LocateLocalBinaries()
+        {
+            try
+            {
+                using (var ofd = new System.Windows.Forms.OpenFileDialog())
+                {
+                    ofd.Title = "Locate ffmpeg.exe";
+                    ofd.Filter = "FFmpeg Executable (ffmpeg.exe)|ffmpeg.exe|Executable Files (*.exe)|*.exe";
+
+                    if (ofd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        string selectedFile = ofd.FileName;
+                        string dir = System.IO.Path.GetDirectoryName(selectedFile);
+                        string selectedFfprobe = System.IO.Path.Combine(dir, "ffprobe.exe");
+
+                        if (!Directory.Exists(binDir)) Directory.CreateDirectory(binDir);
+
+                        try
+                        {
+                            File.Copy(selectedFile, System.IO.Path.Combine(binDir, "ffmpeg.exe"), true);
+                            if (File.Exists(selectedFfprobe))
+                            {
+                                File.Copy(selectedFfprobe, System.IO.Path.Combine(binDir, "ffprobe.exe"), true);
+                            }
+                        }
+                        catch
+                        {
+                            ffmpegPath = selectedFile;
+                            if (File.Exists(selectedFfprobe)) ffprobePath = selectedFfprobe;
+                        }
+
+                        await CheckAndSetupBinaries();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("Could not select binary: " + ex.Message, "Selection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private async Task CheckAndSetupBinaries()
         {
-            if (!File.Exists(ffmpegPath) || !File.Exists(ffprobePath))
+            // 1. Resolve existing ffmpeg and ffprobe anywhere on the machine
+            string resolvedFfmpeg = ResolveExecutable("ffmpeg.exe");
+            string resolvedFfprobe = ResolveExecutable("ffprobe.exe");
+
+            if (!string.IsNullOrEmpty(resolvedFfmpeg) && !string.IsNullOrEmpty(resolvedFfprobe))
             {
-                overlayBinaries.Visibility = Visibility.Visible;
-            }
-            else
-            {
+                ffmpegPath = resolvedFfmpeg;
+                ffprobePath = resolvedFfprobe;
+
+                // If located outside binDir, attempt to cache in binDir for complete self-containment
+                try
+                {
+                    if (!Directory.Exists(binDir)) Directory.CreateDirectory(binDir);
+                    string targetFfmpeg = System.IO.Path.Combine(binDir, "ffmpeg.exe");
+                    string targetFfprobe = System.IO.Path.Combine(binDir, "ffprobe.exe");
+
+                    if (!File.Exists(targetFfmpeg) && !resolvedFfmpeg.Equals(targetFfmpeg, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(resolvedFfmpeg, targetFfmpeg, true);
+                        ffmpegPath = targetFfmpeg;
+                    }
+                    if (!File.Exists(targetFfprobe) && !resolvedFfprobe.Equals(targetFfprobe, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(resolvedFfprobe, targetFfprobe, true);
+                        ffprobePath = targetFfprobe;
+                    }
+                }
+                catch
+                {
+                    // If file copying fails (e.g. read-only permissions), resolved system paths are used directly
+                }
+
                 overlayBinaries.Visibility = Visibility.Collapsed;
                 await DetectHardwareEncoders();
                 LoadHistoryAndStats();
+                return;
             }
+
+            // Both binaries must be available; if missing, display overlay
+            overlayBinaries.Visibility = Visibility.Visible;
         }
 
         private async Task DetectHardwareEncoders()
@@ -1561,12 +1722,24 @@ namespace OptiSqueeze
             }
         }
 
+        // Multi-mirror fallback endpoints for high availability
+        private static readonly string[] FFmpegMirrors = new string[]
+        {
+            // Mirror 1: Official GyanD Release Essentials CDN (Direct CDN, high speed)
+            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+
+            // Mirror 2: Official GyanD GitHub Release Archive (Reliable GitHub mirror)
+            "https://github.com/GyanD/codexffmpeg/releases/download/6.1.1/ffmpeg-6.1.1-essentials_build.zip",
+
+            // Mirror 3: BtbN FFmpeg Auto-Builds GitHub Mirror (High availability fallback)
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+        };
+
         private async Task DownloadBinariesAsync()
         {
             binaryActions.Visibility = Visibility.Collapsed;
             binaryProgressPanel.Visibility = Visibility.Visible;
 
-            string zipUrl = "https://github.com/GyanD/codexffmpeg/releases/download/6.1.1/ffmpeg-6.1.1-essentials_build.zip";
             string zipPath = System.IO.Path.Combine(binDir, "ffmpeg.zip");
             string tempExtractPath = System.IO.Path.Combine(binDir, "ffmpeg_temp");
 
@@ -1574,34 +1747,73 @@ namespace OptiSqueeze
             {
                 if (!Directory.Exists(binDir)) Directory.CreateDirectory(binDir);
 
-                // Download zip
-                using (var client = new HttpClient())
+                // Enable TLS 1.2 for modern secure CDN handshakes
+                try
                 {
-                    client.Timeout = TimeSpan.FromMinutes(10);
-                    using (var response = await client.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead))
-                    {
-                        response.EnsureSuccessStatusCode();
-                        var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                    System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072;
+                }
+                catch {}
 
-                        using (var contentStream = await response.Content.ReadAsStreamAsync())
-                        using (var fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                bool downloadSucceeded = false;
+                Exception lastException = null;
+
+                for (int i = 0; i < FFmpegMirrors.Length; i++)
+                {
+                    string zipUrl = FFmpegMirrors[i];
+                    string mirrorHost = new Uri(zipUrl).Host;
+                    binaryProgressText.Text = string.Format("Downloading FFmpeg (Mirror {0}/{1}: {2})...", i + 1, FFmpegMirrors.Length, mirrorHost);
+                    binaryProgressBar.Value = 0;
+                    binaryProgressPercent.Text = "0%";
+
+                    try
+                    {
+                        using (var client = new HttpClient())
                         {
-                            var buffer = new byte[8192];
-                            long totalRead = 0;
-                            int read;
-                            while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            client.Timeout = TimeSpan.FromMinutes(8);
+                            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) OptiSqueeze/1.0");
+
+                            using (var response = await client.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead))
                             {
-                                await fileStream.WriteAsync(buffer, 0, read);
-                                totalRead += read;
-                                if (totalBytes > 0)
+                                response.EnsureSuccessStatusCode();
+                                var totalBytes = response.Content.Headers.ContentLength ?? 0;
+
+                                using (var contentStream = await response.Content.ReadAsStreamAsync())
+                                using (var fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                                 {
-                                    int pct = (int)((totalRead * 100) / totalBytes);
-                                    binaryProgressBar.Value = pct;
-                                    binaryProgressPercent.Text = pct + "%";
+                                    var buffer = new byte[8192];
+                                    long totalRead = 0;
+                                    int read;
+                                    while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                                    {
+                                        await fileStream.WriteAsync(buffer, 0, read);
+                                        totalRead += read;
+                                        if (totalBytes > 0)
+                                        {
+                                            int pct = (int)((totalRead * 100) / totalBytes);
+                                            binaryProgressBar.Value = pct;
+                                            binaryProgressPercent.Text = pct + "%";
+                                        }
+                                    }
                                 }
                             }
                         }
+
+                        downloadSucceeded = true;
+                        break;
                     }
+                    catch (Exception ex)
+                    {
+                        lastException = ex;
+                        if (File.Exists(zipPath))
+                        {
+                            try { File.Delete(zipPath); } catch {}
+                        }
+                    }
+                }
+
+                if (!downloadSucceeded)
+                {
+                    throw new Exception("All download mirrors failed. Last error: " + (lastException != null ? lastException.Message : "Unknown network error"));
                 }
 
                 // Extract Zip
@@ -1621,17 +1833,17 @@ namespace OptiSqueeze
                         string name = System.IO.Path.GetFileName(file);
                         if (name.Equals("ffmpeg.exe", StringComparison.OrdinalIgnoreCase))
                         {
-                            File.Copy(file, ffmpegPath, true);
+                            File.Copy(file, System.IO.Path.Combine(binDir, "ffmpeg.exe"), true);
                         }
                         else if (name.Equals("ffprobe.exe", StringComparison.OrdinalIgnoreCase))
                         {
-                            File.Copy(file, ffprobePath, true);
+                            File.Copy(file, System.IO.Path.Combine(binDir, "ffprobe.exe"), true);
                         }
                     }
 
-                    // Clean up temp zip
-                    File.Delete(zipPath);
-                    Directory.Delete(tempExtractPath, true);
+                    // Clean up temp files
+                    try { File.Delete(zipPath); } catch {}
+                    try { Directory.Delete(tempExtractPath, true); } catch {}
                 });
 
                 // Check again

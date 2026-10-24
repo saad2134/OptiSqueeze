@@ -71,9 +71,17 @@ This utilizes Windows' built-in C# compiler (`csc.exe`) located in `C:\Windows\M
 
 ## Setup & Binaries
 
-When launching the app, it will look for `ffmpeg.exe` and `ffprobe.exe` inside the `/bin` directory. If they are missing:
-- Click the **Download & Setup Automatically** button in the startup screen to download them.
-- Alternatively, copy your existing files `ffmpeg.exe` and `ffprobe.exe` and paste them into `/bin`.
+When launching the app, it automatically scans for `ffmpeg.exe` and `ffprobe.exe` across:
+- The local `/bin` directory and application root folder
+- Windows system `PATH`
+- Known package managers (WinGet, Scoop, Chocolatey, Python Scripts)
+- Standard system locations (`C:\ffmpeg\bin`, `Program Files\ffmpeg`)
+
+If FFmpeg is found anywhere on your system, OptiSqueeze links and caches it automatically with zero download required.
+
+If FFmpeg is not found anywhere on the PC:
+- Click **Download Automatically** in the setup screen to download with automated multi-mirror fallback redundancy (GyanD CDN, GitHub Releases, and BtbN builds).
+- Or click **Locate on PC** to pick an existing `ffmpeg.exe` directly from your drive.
 
 ---
 
